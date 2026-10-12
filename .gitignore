@@ -1,0 +1,19 @@
+# Entornos virtuales y dependencias
+.venv/
+venv/
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+
+# Configuración propia de cada máquina
+.env
+
+# Datos que genera el sistema al ejecutarse
+storage/
+metadata.json
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
