@@ -5,10 +5,27 @@ from pathlib import Path
 
 import requests
 from flask import Flask, jsonify
+from flasgger import Swagger
 
-#python coordinador/coordinador.py --ip 100.90.6.28 --puerto 4000
+# http://100.90.6.28:4000/apidocs/
+# python coordinador/coordinador.py --ip 100.90.6.28 --puerto 4000
 
 app = Flask(__name__)
+
+swagger = Swagger(
+    app,
+    template={
+        "info": {
+            "title": "API del Coordinador",
+            "description": (
+                "Coordina los nodos del sistema distribuido y "
+                "consulta su disponibilidad."
+            ),
+            "version": "1.0.0",
+        },
+        "schemes": ["http"],
+    },
+)
 
 NODES_FILE = Path(__file__).with_name("nodes.json")
 REQUEST_TIMEOUT = float(os.getenv("NODE_REQUEST_TIMEOUT", "2"))
@@ -26,6 +43,41 @@ def load_nodes():
 
 @app.get("/health")
 def health():
+    """
+    Consulta el estado del coordinador y de todos los nodos configurados.
+    ---
+    tags:
+      - Estado
+    produces:
+      - application/json
+    responses:
+      200:
+        description: Estado consolidado del coordinador y los nodos.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: ok
+            service:
+              type: string
+              example: coordinador
+            nodes:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: nodo1
+                  status:
+                    type: string
+                    example: ok
+                  response:
+                    type: object
+      500:
+        description: No fue posible leer o interpretar nodes.json.
+    """
     nodes_status = []
 
     try:
