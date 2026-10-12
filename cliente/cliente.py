@@ -4,7 +4,7 @@ import sys
 
 import requests
 
-#python cliente/archivo.py --ip 100.90.6.28 --puerto 4000
+#python cliente/cliente.py --ip 100.90.6.28 --puerto 4000
 
 DEFAULT_IP = os.getenv("COORDINATOR_IP", "127.0.0.1")
 DEFAULT_PORT = int(os.getenv("COORDINATOR_PORT", "4000"))

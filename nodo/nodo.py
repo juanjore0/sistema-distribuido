@@ -1,34 +1,16 @@
-"""Nodo de almacenamiento.
-
-Cómo ejecutarlo (desde la raíz del proyecto):
-
-    Windows (PowerShell):
-        $env:NODE_ID = "nodo1"
-        $env:PORT = "3000"
-        py nodo/nodo.py
-
-    macOS / Linux:
-        NODE_ID=nodo1 PORT=3000 python3 nodo/nodo.py
-
-Variables de entorno:
-    NODE_ID  Nombre del nodo, igual al "id" en coordinador/nodes.json (por defecto: nodo-local)
-    PORT     Puerto en el que escucha el nodo (por defecto: 3000)
-
-Prueba: abrir http://localhost:3000/health
-"""
-
-import os
+import argparse
 import socket
 
 from flask import Flask
 
-
-# Configuración por variables de entorno (con valores por defecto)
-NODE_ID = os.getenv("NODE_ID", "nodo-local")
-PORT = int(os.getenv("PORT", "3000"))
-HOSTNAME = socket.gethostname()
+#python nodo/nodo.py --id nodo1 --ip 100.126.64.74 --puerto 3000
+#python nodo/nodo.py --id nodo2 --ip 100.78.158.11 --puerto 3000
+#python nodo/nodo.py --id nodo3 --ip 100.80.123.59 --puerto 3000
 
 app = Flask(__name__)
+
+NODE_ID = "nodo-local"
+PORT = 3000
 
 
 @app.get("/health")
@@ -37,11 +19,20 @@ def health():
         "status": "ok",
         "service": "nodo",
         "node_id": NODE_ID,
-        "hostname": HOSTNAME,
+        "hostname": socket.gethostname(),
         "port": PORT,
     }
 
 
 if __name__ == "__main__":
-    print(f"Iniciando {NODE_ID} en {HOSTNAME}, puerto {PORT}")
-    app.run(host="0.0.0.0", port=PORT)
+    parser = argparse.ArgumentParser(description="Inicia un nodo de almacenamiento")
+    parser.add_argument("--id", default="nodo-local", help="Identificador del nodo")
+    parser.add_argument("--ip", default="0.0.0.0", help="Interfaz donde escucha el nodo")
+    parser.add_argument("--puerto", type=int, required=True, help="Puerto del nodo")
+    args = parser.parse_args()
+
+    NODE_ID = args.id
+    PORT = args.puerto
+
+    print(f"Iniciando {NODE_ID} en {args.ip}, puerto {PORT}")
+    app.run(host=args.ip, port=args.puerto)
