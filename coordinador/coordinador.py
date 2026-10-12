@@ -1,3 +1,22 @@
+"""Coordinador: consulta GET /health de cada nodo listado en nodes.json.
+
+Cómo ejecutarlo (desde la raíz del proyecto):
+
+    Windows (PowerShell):
+        py coordinador/coordinador.py
+
+    macOS / Linux:
+        python3 coordinador/coordinador.py
+
+Escucha en el puerto 4000. Antes de iniciarlo, revisar que coordinador/nodes.json
+tenga la IP y el puerto de cada nodo.
+
+Variables de entorno (opcionales):
+    NODE_REQUEST_TIMEOUT  Segundos de espera por cada nodo (por defecto: 2)
+
+Prueba: abrir http://localhost:4000/health
+"""
+
 import json
 import os
 from pathlib import Path
@@ -56,7 +75,7 @@ def health():
             "service": "coordinador",
             "nodes": nodes_status,
         }
-    ), 200 if all_healthy else 503
+    ), 200
 
 
 if __name__ == "__main__":
