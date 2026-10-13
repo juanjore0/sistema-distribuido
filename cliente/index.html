@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mis archivos</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --card: #ffffff;
+      --text: #1b1f24;
+      --muted: #6b7380;
+      --border: #e4e7eb;
+      --accent: #3b5bdb;
+      --accent-soft: #eaf0ff;
+      --ok: #2f9e44;
+      --error: #e03131;
+      --error-soft: #fdecec;
+      --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 6px 16px rgba(16, 24, 40, .05);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111418;
+        --card: #1a1e24;
+        --text: #e8eaed;
+        --muted: #9aa3ad;
+        --border: #2b3139;
+        --accent: #748ffc;
+        --accent-soft: #232b45;
+        --ok: #51cf66;
+        --error: #ff6b6b;
+        --error-soft: #3a1f22;
+        --shadow: none;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 720px; margin: 0 auto; padding: 40px 16px 56px; }
+
+    h1 { margin: 0; font-size: 26px; letter-spacing: -.01em; }
+    .subtitle { margin: 4px 0 24px; color: var(--muted); }
+
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; box-shadow: var(--shadow);
+    }
+
+    /* Subir */
+    .drop {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 32px 16px; margin-bottom: 20px; text-align: center; cursor: pointer;
+      border: 2px dashed var(--border); border-radius: 16px; background: var(--card);
+      color: var(--muted); transition: border-color .15s, background .15s;
+    }
+    .drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+    .drop input { display: none; }
+    .drop .icon {
+      width: 44px; height: 44px; border-radius: 12px; margin-bottom: 6px;
+      display: grid; place-items: center; background: var(--accent-soft); color: var(--accent);
+    }
+    .drop strong { color: var(--text); font-size: 16px; }
+    .drop.busy { pointer-events: none; }
+
+    .progress {
+      width: 100%; max-width: 320px; height: 6px; margin-top: 12px;
+      background: var(--border); border-radius: 999px; overflow: hidden;
+    }
+    .progress span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .1s; }
+
+    /* Lista */
+    .list-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 16px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap;
+    }
+    .list-head h2 { margin: 0; font-size: 16px; }
+    .search {
+      flex: 1; max-width: 240px; min-width: 140px;
+      font: inherit; font-size: 14px; color: var(--text); background: var(--bg);
+      border: 1px solid var(--border); border-radius: 9px; padding: 7px 12px;
+    }
+    .search:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+
+    ul.files { list-style: none; margin: 0; padding: 0; }
+    .file {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 20px; border-bottom: 1px solid var(--border);
+    }
+    .file:last-child { border-bottom: none; }
+    .ext {
+      flex: none; width: 42px; height: 42px; border-radius: 10px;
+      display: grid; place-items: center;
+      font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
+      background: var(--accent-soft); color: var(--accent);
+    }
+    .info { flex: 1; min-width: 0; }
+    .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .meta { color: var(--muted); font-size: 13px; }
+    .meta .unavailable { color: var(--error); }
+
+    button {
+      flex: none; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+      border-radius: 9px; padding: 8px 14px;
+      background: transparent; color: var(--accent); border: 1px solid var(--border);
+      transition: background .15s;
+    }
+    button:not(:disabled):hover { background: var(--accent-soft); }
+    button:disabled { color: var(--muted); cursor: default; }
+    button.delete { color: var(--error); }
+    button.delete:not(:disabled):hover { background: var(--error-soft); }
+    .actions { flex: none; display: flex; gap: 8px; }
+
+    .empty { padding: 40px 20px; text-align: center; color: var(--muted); }
+
+    /* Aviso flotante */
+    .toast {
+      position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
+      max-width: calc(100% - 32px); padding: 12px 18px; border-radius: 10px;
+      background: var(--text); color: var(--bg); font-size: 14px; font-weight: 500;
+      opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .toast.error { background: var(--error); color: #fff; }
+
+    @media (max-width: 480px) {
+      .file { padding: 12px 16px; gap: 12px; }
+      .ext { width: 36px; height: 36px; }
+      button { padding: 7px 10px; }
+      .actions { flex-direction: column; gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Mis archivos</h1>
+  <p class="subtitle">Guarda tus archivos y descárgalos cuando los necesites.</p>
+
+  <label class="drop" id="drop">
+    <input type="file" id="file">
+    <span class="icon" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 16V4M7 9l5-5 5 5M5 20h14"/>
+      </svg>
+    </span>
+    <strong id="drop-title">Subir un archivo</strong>
+    <span id="drop-text">Arrástralo aquí o haz clic para elegirlo</span>
+    <div class="progress" id="progress" hidden><span></span></div>
+  </label>
+
+  <section class="card">
+    <div class="list-head">
+      <h2 id="count">Archivos</h2>
+      <input class="search" id="search" type="search" placeholder="Buscar…" aria-label="Buscar archivos">
+    </div>
+    <ul class="files" id="files">
+      <li class="empty">Cargando…</li>
+    </ul>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const api = (nombre) => "/api/files/" + encodeURIComponent(nombre);
+
+  let files = [];
+  let lastResponse = "";
+  let uploading = false;
+
+  // ---------- utilidades ----------
+  function el(tag, attrs = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(attrs)) {
+      if (key === "class") node.className = value;
+      else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+      else node.setAttribute(key, value);
+    }
+    for (const child of children) {
+      if (child != null) node.append(child);
+    }
+    return node;
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    const units = ["KB", "MB", "GB"];
+    let value = bytes / 1024, i = 0;
+    while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
+    return value.toFixed(value < 10 ? 1 : 0) + " " + units[i];
+  }
+
+  function formatDate(iso) {
+    if (!iso) return null;
+    return new Date(iso).toLocaleString("es", { dateStyle: "medium", timeStyle: "short" });
+  }
+
+  function extension(nombre) {
+    const dot = nombre.lastIndexOf(".");
+    return dot > 0 ? nombre.slice(dot + 1, dot + 5) : "doc";
+  }
+
+  let toastTimer;
+  function toast(message, isError = false) {
+    const box = $("toast");
+    box.textContent = message;
+    box.className = "toast show" + (isError ? " error" : "");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => (box.className = "toast"), 3500);
+  }
+
+  async function errorMessage(response) {
+    try { return (await response.json()).error || response.statusText; }
+    catch { return response.statusText || "Error " + response.status; }
+  }
+
+  // ---------- lista ----------
+  function render() {
+    const query = $("search").value.trim().toLowerCase();
+    const visible = files.filter((file) => file.name.toLowerCase().includes(query));
+
+    $("count").textContent = files.length === 1 ? "1 archivo" : `${files.length} archivos`;
+
+    if (!visible.length) {
+      $("files").replaceChildren(el("li", { class: "empty" },
+        files.length ? "Ningún archivo coincide con la búsqueda." : "Aún no tienes archivos. Sube el primero."));
+      return;
+    }
+
+    $("files").replaceChildren(...visible.map((file) => {
+      const fecha = formatDate(file.uploaded_at);
+      return el("li", { class: "file" },
+        el("span", { class: "ext", "aria-hidden": "true" }, extension(file.name)),
+        el("div", { class: "info" },
+          el("div", { class: "name", title: file.name }, file.name),
+          el("div", { class: "meta" },
+            [formatBytes(file.size), fecha].filter(Boolean).join(" · "),
+            file.available ? null : el("span", { class: "unavailable" }, " · No disponible por ahora"))),
+        el("div", { class: "actions" },
+          el("button", {
+            onclick: (event) => download(file.name, event.currentTarget),
+            ...(file.available ? {} : { disabled: "" }),
+          }, "Descargar"),
+          el("button", {
+            class: "delete",
+            onclick: (event) => remove(file.name, event.currentTarget),
+          }, "Eliminar")));
+    }));
+  }
+
+  async function refresh() {
+    try {
+      const response = await fetch("/api/files");
+      const text = await response.text();
+      if (text === lastResponse) return;   // nada cambió
+      lastResponse = text;
+      files = JSON.parse(text).files
+        .sort((a, b) => (b.uploaded_at || "").localeCompare(a.uploaded_at || ""));
+      render();
+    } catch {
+      if (!files.length) {
+        $("files").replaceChildren(el("li", { class: "empty" },
+          "No fue posible conectar con el servicio. Reintentando…"));
+      }
+    }
+  }
+
+  // ---------- subir ----------
+  function setDrop(title, text, percent = null) {
+    $("drop-title").textContent = title;
+    $("drop-text").textContent = text;
+    $("progress").hidden = percent === null;
+    $("progress").firstElementChild.style.width = (percent || 0) + "%";
+  }
+
+  function upload(file) {
+    if (!file || uploading) return;
+    if (files.some((existing) => existing.name === file.name)) {
+      toast(`Ya tienes un archivo llamado "${file.name}". Cámbiale el nombre e inténtalo de nuevo.`, true);
+      return;
+    }
+
+    uploading = true;
+    $("drop").classList.add("busy");
+    setDrop(`Subiendo ${file.name}`, formatBytes(file.size), 0);
+
+    // XMLHttpRequest permite mostrar el avance de la subida
+    const request = new XMLHttpRequest();
+    request.open("PUT", api(file.name));
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        setDrop(`Subiendo ${file.name}`, `${percent} %`, percent);
+      }
+    };
+    request.onload = () => {
+      if (request.status === 201) {
+        toast(`"${file.name}" se guardó correctamente`);
+        refresh();
+      } else {
+        let message = "Inténtalo de nuevo.";
+        try { message = JSON.parse(request.responseText).error || message; } catch {}
+        if (request.status === 409) message = `Ya existe un archivo llamado "${file.name}".`;
+        if (request.status === 503) message = "El servicio no está disponible en este momento.";
+        toast("No se pudo subir: " + message, true);
+      }
+      finish();
+    };
+    request.onerror = () => {
+      toast("No se pudo subir: sin conexión con el servicio.", true);
+      finish();
+    };
+    request.send(file);
+  }
+
+  function finish() {
+    uploading = false;
+    $("drop").classList.remove("busy");
+    $("file").value = "";
+    setDrop("Subir un archivo", "Arrástralo aquí o haz clic para elegirlo");
+  }
+
+  // ---------- descargar ----------
+  async function download(nombre, button) {
+    button.disabled = true;
+    button.textContent = "Descargando…";
+    try {
+      const response = await fetch(api(nombre));
+      if (!response.ok) {
+        throw new Error(response.status === 503
+          ? "el archivo no está disponible en este momento."
+          : await errorMessage(response));
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = el("a", { href: url, download: nombre });
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast("No se pudo descargar: " + error.message, true);
+    } finally {
+      button.disabled = false;
+      button.textContent = "Descargar";
+    }
+  }
+
+  // ---------- eliminar ----------
+  async function remove(nombre, button) {
+    if (!confirm(`¿Eliminar "${nombre}"? Esta acción no se puede deshacer.`)) return;
+    button.disabled = true;
+    button.textContent = "Eliminando…";
+    try {
+      const response = await fetch(api(nombre), { method: "DELETE" });
+      if (!response.ok) {
+        throw new Error(response.status === 404
+          ? "el archivo ya no existe."
+          : await errorMessage(response));
+      }
+      toast(`"${nombre}" se eliminó`);
+      refresh();
+    } catch (error) {
+      toast("No se pudo eliminar: " + error.message, true);
+      button.disabled = false;
+      button.textContent = "Eliminar";
+    }
+  }
+
+  // ---------- eventos de la página ----------
+  $("file").addEventListener("change", (event) => upload(event.target.files[0]));
+  $("search").addEventListener("input", render);
+
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((type) => drop.addEventListener(type, (event) => {
+    event.preventDefault();
+    drop.classList.add("over");
+  }));
+  ["dragleave", "drop"].forEach((type) => drop.addEventListener(type, () => drop.classList.remove("over")));
+  drop.addEventListener("drop", (event) => {
+    event.preventDefault();
+    upload(event.dataTransfer.files[0]);
+  });
+
+  refresh();
+  setInterval(refresh, 3000);
+</script>
+</body>
+</html>

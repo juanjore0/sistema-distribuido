@@ -11,9 +11,11 @@ from pathlib import Path
 from urllib.parse import quote
 
 import requests
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify, request, send_file
 from flasgger import Swagger
 
+# Gestor de archivos (usuario): http://100.90.6.28:4000/
+# Panel del coordinador:        http://100.90.6.28:4000/panel
 # http://100.90.6.28:4000/apidocs/
 # python coordinador/coordinador.py --ip 100.90.6.28 --puerto 4000
 #
@@ -43,9 +45,12 @@ swagger = Swagger(
 
 NODES_FILE = Path(__file__).with_name("nodes.json")
 METADATA_FILE = Path(__file__).with_name("metadata.json")
+USER_PAGE = Path(__file__).resolve().parent.parent / "cliente" / "index.html"
+PANEL_FILE = Path(__file__).with_name("panel.html")
 REQUEST_TIMEOUT = float(os.getenv("NODE_REQUEST_TIMEOUT", "2"))
 UPLOAD_TIMEOUT = float(os.getenv("NODE_UPLOAD_TIMEOUT", "30"))
 REPLICAS = int(os.getenv("REPLICAS", "2"))
+HEARTBEAT_INTERVAL = float(os.getenv("HEARTBEAT_INTERVAL", "3"))
 SYNC_INTERVAL = float(os.getenv("SYNC_INTERVAL", "30"))
 
 # Protege metadata.json: Flask atiende varias peticiones a la vez
@@ -165,6 +170,15 @@ def rank_nodes(candidates, nodes, metadata):
     )
 
 
+def known_alive_ids(nodes):
+    """Nodos vivos según el último heartbeat; consulta en el momento si falta alguno."""
+    if any(node["id"] not in node_state for node in nodes):
+        check_nodes(nodes)
+    return {
+        node["id"] for node in nodes if node_state.get(node["id"], {}).get("alive")
+    }
+
+
 def choose_nodes(nodes, metadata):
     """Balanceador: nodos vivos ordenados por cantidad de archivos (menos primero).
 
@@ -175,6 +189,18 @@ def choose_nodes(nodes, metadata):
     alive_ids = {status["id"] for status in statuses if status["status"] == "ok"}
     candidates = [node for node in nodes if node.get("id") in alive_ids]
     return rank_nodes(candidates, nodes, metadata), alive_ids
+
+
+@app.get("/")
+def user_page():
+    """Gestor de archivos para el usuario (cliente/index.html)."""
+    return send_file(USER_PAGE)
+
+
+@app.get("/panel")
+def panel():
+    """Panel del coordinador: nodos, réplicas y eventos (coordinador/panel.html)."""
+    return send_file(PANEL_FILE)
 
 
 @app.get("/health")
@@ -421,8 +447,7 @@ def list_files():
     with metadata_lock:
         metadata = load_metadata()
 
-    statuses = check_nodes(nodes)
-    alive_ids = {status["id"] for status in statuses if status["status"] == "ok"}
+    alive_ids = known_alive_ids(nodes)
     counts = files_per_node(metadata)
 
     files = []
@@ -630,6 +655,71 @@ def delete_file(nombre):
             "complete": not pending,
         }
     ), 200
+
+
+@app.get("/api/status")
+def status():
+    """
+    Estado de cada nodo (según el heartbeat) y eventos recientes.
+    ---
+    tags:
+      - Estado
+    produces:
+      - application/json
+    responses:
+      200:
+        description: Nodos y eventos.
+        schema:
+          type: object
+          properties:
+            replicas:
+              type: integer
+              example: 2
+            nodes:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: nodo1
+                  url:
+                    type: string
+                  alive:
+                    type: boolean
+                  hostname:
+                    type: string
+                  last_seen:
+                    type: string
+                  files:
+                    type: integer
+            events:
+              type: array
+              items:
+                type: string
+    """
+    nodes = load_nodes()
+    alive_ids = known_alive_ids(nodes)
+    with metadata_lock:
+        counts = files_per_node(load_metadata())
+
+    return jsonify(
+        {
+            "replicas": REPLICAS,
+            "nodes": [
+                {
+                    "id": node["id"],
+                    "url": node["url"],
+                    "alive": node["id"] in alive_ids,
+                    "hostname": node_state.get(node["id"], {}).get("hostname"),
+                    "last_seen": node_state.get(node["id"], {}).get("last_seen"),
+                    "files": counts.get(node["id"], 0),
+                }
+                for node in nodes
+            ],
+            "events": list(reversed(events)),
+        }
+    )
 
 
 def fetch_inventory(node):
@@ -876,6 +966,16 @@ def rebuild():
     return jsonify(sync_metadata())
 
 
+def heartbeat_loop():
+    """Consulta /health de todos los nodos cada HEARTBEAT_INTERVAL segundos."""
+    while True:
+        try:
+            check_nodes(load_nodes())
+        except Exception as error:  # el hilo no debe morir por un error puntual
+            log_event(f"Error en el heartbeat: {error}")
+        time.sleep(HEARTBEAT_INTERVAL)
+
+
 def sync_loop():
     """Sincroniza al arrancar y luego cada SYNC_INTERVAL segundos."""
     while True:
@@ -909,6 +1009,9 @@ if __name__ == "__main__":
 
     print(f"Iniciando coordinador en {args.ip}, puerto {args.puerto}")
     print(f"Réplicas por archivo: {REPLICAS}")
+    print(f"Heartbeat cada {HEARTBEAT_INTERVAL:g} s")
     print(f"Sincronización con los nodos cada {SYNC_INTERVAL:g} s")
+    check_nodes(load_nodes())
+    threading.Thread(target=heartbeat_loop, daemon=True).start()
     threading.Thread(target=sync_loop, daemon=True).start()
     app.run(host=args.ip, port=args.puerto)
