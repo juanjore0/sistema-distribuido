@@ -3,22 +3,26 @@ import hashlib
 import json
 import os
 import threading
+import time
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
 import requests
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request
 from flasgger import Swagger
 
 # http://100.90.6.28:4000/apidocs/
 # python coordinador/coordinador.py --ip 100.90.6.28 --puerto 4000
 #
-# Subir, listar y borrar desde la terminal:
+# Subir, listar, descargar, borrar y sincronizar desde la terminal:
 #   curl -X PUT --data-binary @archivo.pdf http://100.90.6.28:4000/api/files/archivo.pdf
 #   curl http://100.90.6.28:4000/api/files
+#   curl -i -o archivo.pdf http://100.90.6.28:4000/api/files/archivo.pdf
 #   curl -X DELETE http://100.90.6.28:4000/api/files/archivo.pdf
+#   curl -X POST http://100.90.6.28:4000/api/rebuild
 
 app = Flask(__name__)
 
@@ -42,9 +46,34 @@ METADATA_FILE = Path(__file__).with_name("metadata.json")
 REQUEST_TIMEOUT = float(os.getenv("NODE_REQUEST_TIMEOUT", "2"))
 UPLOAD_TIMEOUT = float(os.getenv("NODE_UPLOAD_TIMEOUT", "30"))
 REPLICAS = int(os.getenv("REPLICAS", "2"))
+SYNC_INTERVAL = float(os.getenv("SYNC_INTERVAL", "30"))
 
 # Protege metadata.json: Flask atiende varias peticiones a la vez
 metadata_lock = threading.Lock()
+
+# Estado de los nodos en memoria: {id: {"alive", "last_seen", "hostname"}}
+node_state = {}
+# Últimos eventos, para mostrarlos en el panel
+events = deque(maxlen=50)
+
+
+def log_event(mensaje):
+    linea = f"[{datetime.now().strftime('%H:%M:%S')}] {mensaje}"
+    events.append(linea)
+    print(linea)
+
+
+def set_node_alive(node_id, alive, hostname=None):
+    """Actualiza el estado del nodo y registra cuando pasa de ACTIVO a CAÍDO o al revés."""
+    previous = node_state.get(node_id, {}).get("alive")
+    state = node_state.setdefault(node_id, {})
+    state["alive"] = alive
+    if alive:
+        state["last_seen"] = datetime.now(timezone.utc).isoformat()
+        if hostname:
+            state["hostname"] = hostname
+    if previous is not None and previous != alive:
+        log_event(f"{node_id} {'ACTIVO' if alive else 'CAÍDO'}")
 
 
 def load_nodes():
@@ -91,8 +120,11 @@ def check_node(node):
             timeout=REQUEST_TIMEOUT,
         )
         response.raise_for_status()
-        return {"id": node_id, "status": "ok", "response": response.json()}
+        node_health = response.json()
+        set_node_alive(node_id, True, node_health.get("hostname"))
+        return {"id": node_id, "status": "ok", "response": node_health}
     except (requests.RequestException, ValueError) as error:
+        set_node_alive(node_id, False)
         return {"id": node_id, "status": "error", "error": str(error)}
 
 
@@ -112,20 +144,15 @@ def files_per_node(metadata):
     return counts
 
 
-def choose_nodes(nodes, metadata):
-    """Balanceador: nodos vivos ordenados por cantidad de archivos (menos primero).
+def rank_nodes(candidates, nodes, metadata):
+    """Ordena los nodos por cantidad de archivos (menos primero).
 
-    Devuelve todos los candidatos en ese orden; quien llama usa los primeros
-    REPLICAS y, si alguno falla al subir, sigue con el siguiente.
+    Empate en cantidad de archivos → el que tenga menos bytes → orden de nodes.json.
     """
-    statuses = check_nodes(nodes)
-    alive_ids = {status["id"] for status in statuses if status["status"] == "ok"}
     counts = files_per_node(metadata)
     order = {node["id"]: index for index, node in enumerate(nodes)}
-
-    candidates = [node for node in nodes if node.get("id") in alive_ids]
-    # Empate en cantidad de archivos → el que tenga menos bytes → orden de nodes.json
-    candidates.sort(
+    return sorted(
+        candidates,
         key=lambda node: (
             counts.get(node["id"], 0),
             sum(
@@ -134,9 +161,20 @@ def choose_nodes(nodes, metadata):
                 if node["id"] in info["nodes"]
             ),
             order[node["id"]],
-        )
+        ),
     )
-    return candidates, alive_ids
+
+
+def choose_nodes(nodes, metadata):
+    """Balanceador: nodos vivos ordenados por cantidad de archivos (menos primero).
+
+    Devuelve todos los candidatos en ese orden; quien llama usa los primeros
+    REPLICAS y, si alguno falla al subir, sigue con el siguiente.
+    """
+    statuses = check_nodes(nodes)
+    alive_ids = {status["id"] for status in statuses if status["status"] == "ok"}
+    candidates = [node for node in nodes if node.get("id") in alive_ids]
+    return rank_nodes(candidates, nodes, metadata), alive_ids
 
 
 @app.get("/health")
@@ -261,6 +299,16 @@ def upload_file(nombre):
     with metadata_lock:
         metadata = load_metadata()
         if nombre in metadata:
+            if metadata[nombre].get("deleting"):
+                return jsonify(
+                    {
+                        "error": (
+                            f"{nombre} tiene un borrado pendiente en "
+                            f"{', '.join(metadata[nombre]['nodes'])}; "
+                            "inténtelo cuando ese nodo vuelva"
+                        ),
+                    }
+                ), 409
             return jsonify(
                 {
                     "error": f"El archivo {nombre} ya existe",
@@ -305,9 +353,9 @@ def upload_file(nombre):
         }
         save_metadata(metadata)
 
-    print(f"{nombre} guardado en {', '.join(saved)}")
+    log_event(f"{nombre} guardado en {', '.join(saved)}")
     if len(saved) < REPLICAS:
-        print(
+        log_event(
             f"ADVERTENCIA: {nombre} quedó en {len(saved)} nodo(s), "
             f"se esperaban {REPLICAS}"
         )
@@ -379,6 +427,8 @@ def list_files():
 
     files = []
     for nombre, info in sorted(metadata.items()):
+        if info.get("deleting"):
+            continue
         file_nodes = [
             {"id": node_id, "alive": node_id in alive_ids}
             for node_id in info["nodes"]
@@ -400,6 +450,97 @@ def list_files():
             "load": {node["id"]: counts.get(node["id"], 0) for node in nodes},
         }
     )
+
+
+@app.get("/api/files/<nombre>")
+def download_file(nombre):
+    """
+    Descarga un archivo desde alguna réplica disponible (failover).
+    Prueba primero los nodos que se sabe que están vivos; si uno no responde,
+    no tiene el archivo o lo tiene dañado, pasa a la siguiente réplica.
+    El encabezado X-Served-By indica qué nodo respondió.
+    ---
+    tags:
+      - Archivos
+    produces:
+      - application/octet-stream
+    parameters:
+      - name: nombre
+        in: path
+        type: string
+        required: true
+    responses:
+      200:
+        description: Contenido del archivo.
+        headers:
+          X-Served-By:
+            type: string
+            description: Nodo que entregó el archivo.
+          X-Failed-Nodes:
+            type: string
+            description: Nodos que fallaron antes (separados por coma).
+      404:
+        description: El archivo no existe.
+      503:
+        description: Ninguna réplica está disponible.
+    """
+    nombre = os.path.basename(nombre)
+    nodes_by_id = {node["id"]: node for node in load_nodes()}
+
+    with metadata_lock:
+        info = load_metadata().get(nombre)
+    if info is None or info.get("deleting"):
+        return jsonify({"error": f"El archivo {nombre} no existe"}), 404
+
+    # Los nodos vivos primero; los que no sabemos o están caídos, después
+    order = sorted(
+        info["nodes"],
+        key=lambda node_id: not node_state.get(node_id, {}).get("alive", True),
+    )
+
+    failed = []
+    for node_id in order:
+        node = nodes_by_id.get(node_id)
+        if node is None:
+            failed.append(node_id)
+            continue
+        try:
+            response = requests.get(
+                node_file_url(node, nombre),
+                timeout=REQUEST_TIMEOUT,
+            )
+            if response.status_code == 404:
+                log_event(f"{node_id} no tiene {nombre}, probando otra réplica")
+                failed.append(node_id)
+                continue
+            response.raise_for_status()
+            if hashlib.sha256(response.content).hexdigest() != info["sha256"]:
+                log_event(f"{node_id} tiene {nombre} dañado, probando otra réplica")
+                failed.append(node_id)
+                continue
+        except requests.RequestException:
+            log_event(f"{node_id} no respondió, probando otra réplica")
+            set_node_alive(node_id, False)
+            failed.append(node_id)
+            continue
+
+        set_node_alive(node_id, True)
+        detalle = f" (fallaron antes: {', '.join(failed)})" if failed else ""
+        log_event(f"{nombre} servido por {node_id}{detalle}")
+        return Response(
+            response.content,
+            mimetype="application/octet-stream",
+            headers={
+                "Content-Disposition": f"attachment; filename*=UTF-8''{quote(nombre)}",
+                "X-Served-By": node_id,
+                "X-Failed-Nodes": ",".join(failed),
+            },
+        )
+
+    log_event(f"{nombre}: ninguna réplica disponible")
+    return jsonify(
+        {"error": f"Ninguna réplica de {nombre} está disponible", "failed": failed}
+    ), 503
 
 
 @app.delete("/api/files/<nombre>")
@@ -443,7 +584,7 @@ def delete_file(nombre):
 
     with metadata_lock:
         metadata = load_metadata()
-        if nombre not in metadata:
+        if nombre not in metadata or metadata[nombre].get("deleting"):
             return jsonify({"error": f"El archivo {nombre} no existe"}), 404
 
         deleted_from = []
@@ -466,14 +607,17 @@ def delete_file(nombre):
                 pending.append({"id": node_id, "error": str(error)})
 
         if pending:
+            # Queda marcado para que la sincronización termine de borrarlo
+            # cuando esos nodos vuelvan (y no lo re-replique)
             metadata[nombre]["nodes"] = [node["id"] for node in pending]
+            metadata[nombre]["deleting"] = True
         else:
             del metadata[nombre]
         save_metadata(metadata)
 
-    print(f"{nombre} borrado de {', '.join(deleted_from) or 'ningún nodo'}")
+    log_event(f"{nombre} borrado de {', '.join(deleted_from) or 'ningún nodo'}")
     if pending:
-        print(
+        log_event(
             f"ADVERTENCIA: {nombre} sigue en "
             f"{', '.join(node['id'] for node in pending)}"
         )
@@ -486,6 +630,260 @@ def delete_file(nombre):
             "complete": not pending,
         }
     ), 200
+
+
+def fetch_inventory(node):
+    """Pide GET /files a un nodo. Devuelve {nombre: {size, sha256}} o None si falla."""
+    try:
+        response = requests.get(
+            f"{node['url'].rstrip('/')}/files",
+            timeout=REQUEST_TIMEOUT,
+        )
+        response.raise_for_status()
+        return {item["name"]: item for item in response.json()["files"]}
+    except (requests.RequestException, ValueError, KeyError):
+        return None
+
+
+def copy_between_nodes(nombre, info, sources, targets, report):
+    """Copia un archivo desde una réplica sana hacia otros nodos hasta tener REPLICAS."""
+    datos = None
+    for source in sources:
+        try:
+            response = requests.get(
+                node_file_url(source, nombre), timeout=UPLOAD_TIMEOUT
+            )
+            response.raise_for_status()
+            if hashlib.sha256(response.content).hexdigest() == info["sha256"]:
+                datos, source_id = response.content, source["id"]
+                break
+        except requests.RequestException:
+            continue
+    if datos is None:
+        return
+
+    for target in targets:
+        if len(info["nodes"]) >= REPLICAS:
+            break
+        try:
+            response = requests.put(
+                node_file_url(target, nombre), data=datos, timeout=UPLOAD_TIMEOUT
+            )
+            response.raise_for_status()
+            if response.json().get("sha256") != info["sha256"]:
+                continue
+        except (requests.RequestException, ValueError):
+            continue
+        info["nodes"].append(target["id"])
+        report["replicated"].append(
+            {"name": nombre, "from": source_id, "to": target["id"]}
+        )
+        log_event(f"{nombre} re-replicado de {source_id} a {target['id']}")
+
+
+def sync_metadata():
+    """Compara metadata.json con lo que realmente tiene cada nodo y lo repara.
+
+    - Archivos que un nodo tiene y metadata.json no conoce → se agregan.
+    - Archivos que metadata.json dice que un nodo tiene y ya no están → se quita el nodo.
+    - Mismo nombre con sha256 distinto → conflicto (esa copia no cuenta como réplica).
+    - Archivos con menos de REPLICAS copias → se copian a otro nodo vivo.
+    - Archivos que ya no están en ningún nodo → se quitan y se reportan como perdidos.
+    - Borrados pendientes (el nodo estaba caído) → se terminan cuando el nodo vuelve.
+
+    Los nodos caídos no se tocan: que no respondan no significa que perdieron sus archivos.
+    """
+    nodes = load_nodes()
+    report = {
+        "added": [],
+        "removed": [],
+        "conflicts": [],
+        "lost": [],
+        "replicated": [],
+        "under_replicated": [],
+        "unreachable": [],
+        "deleted": [],
+    }
+
+    with metadata_lock:
+        check_nodes(nodes)
+        alive = [node for node in nodes if node_state.get(node["id"], {}).get("alive")]
+        with ThreadPoolExecutor(max_workers=max(len(alive), 1)) as pool:
+            results = list(pool.map(fetch_inventory, alive))
+        inventories = {}
+        for node, inventory in zip(alive, results):
+            if inventory is None:
+                report["unreachable"].append(node["id"])
+            else:
+                inventories[node["id"]] = inventory
+        for node in nodes:
+            if node["id"] not in inventories and node["id"] not in report["unreachable"]:
+                report["unreachable"].append(node["id"])
+
+        metadata = load_metadata()
+        nodes_by_id = {node["id"]: node for node in nodes}
+
+        # 0. Terminar borrados pendientes en los nodos que volvieron
+        for nombre, info in list(metadata.items()):
+            if not info.get("deleting"):
+                continue
+            for node_id in list(info["nodes"]):
+                if node_id not in inventories:
+                    continue
+                try:
+                    response = requests.delete(
+                        node_file_url(nodes_by_id[node_id], nombre),
+                        timeout=REQUEST_TIMEOUT,
+                    )
+                    if response.status_code != 404:
+                        response.raise_for_status()
+                except requests.RequestException:
+                    continue
+                info["nodes"].remove(node_id)
+                inventories[node_id].pop(nombre, None)
+                log_event(f"{nombre} borrado de {node_id} (borrado pendiente)")
+            if not info["nodes"]:
+                del metadata[nombre]
+                report["deleted"].append(nombre)
+
+        # 1. Lo que dicen los metadatos vs. lo que hay en cada nodo
+        for nombre, info in metadata.items():
+            if info.get("deleting"):
+                continue
+            for node_id in list(info["nodes"]):
+                if node_id not in inventories:
+                    continue
+                real = inventories[node_id].get(nombre)
+                if real is None:
+                    info["nodes"].remove(node_id)
+                    report["removed"].append({"name": nombre, "node": node_id})
+                    log_event(f"{node_id} ya no tiene {nombre}")
+                elif real["sha256"] != info["sha256"]:
+                    info["nodes"].remove(node_id)
+                    report["conflicts"].append({"name": nombre, "node": node_id})
+                    log_event(f"{node_id} tiene {nombre} con otro sha256 (dañado)")
+
+        # 2. Archivos en los nodos que los metadatos no conocen
+        for node_id, inventory in inventories.items():
+            for nombre, real in inventory.items():
+                info = metadata.get(nombre)
+                if info is not None and info.get("deleting"):
+                    continue
+                if info is None:
+                    metadata[nombre] = {
+                        "size": real["size"],
+                        "sha256": real["sha256"],
+                        "nodes": [node_id],
+                        "uploaded_at": None,
+                    }
+                    report["added"].append({"name": nombre, "node": node_id})
+                    log_event(f"{nombre} encontrado en {node_id}, agregado a metadatos")
+                elif node_id in info["nodes"]:
+                    continue
+                elif real["sha256"] == info["sha256"]:
+                    info["nodes"].append(node_id)
+                    report["added"].append({"name": nombre, "node": node_id})
+                    log_event(f"{nombre} encontrado en {node_id}, agregado como réplica")
+                elif {"name": nombre, "node": node_id} not in report["conflicts"]:
+                    report["conflicts"].append({"name": nombre, "node": node_id})
+                    log_event(f"{node_id} tiene {nombre} con otro sha256 (conflicto)")
+
+        # 3. Archivos que ya no están en ningún nodo
+        for nombre in [nombre for nombre, info in metadata.items() if not info["nodes"]]:
+            del metadata[nombre]
+            report["lost"].append(nombre)
+            log_event(f"{nombre} PERDIDO: no queda ninguna réplica")
+
+        # 4. Re-replicar lo que quedó con menos copias de las esperadas
+        for nombre, info in metadata.items():
+            if info.get("deleting") or len(info["nodes"]) >= REPLICAS:
+                continue
+            sources = [
+                nodes_by_id[node_id]
+                for node_id in info["nodes"]
+                if node_id in inventories
+            ]
+            targets = rank_nodes(
+                [
+                    node
+                    for node in nodes
+                    if node["id"] in inventories and node["id"] not in info["nodes"]
+                ],
+                nodes,
+                metadata,
+            )
+            copy_between_nodes(nombre, info, sources, targets, report)
+            if len(info["nodes"]) < REPLICAS:
+                report["under_replicated"].append(
+                    {"name": nombre, "nodes": list(info["nodes"])}
+                )
+
+        save_metadata(metadata)
+
+    return report
+
+
+@app.post("/api/rebuild")
+def rebuild():
+    """
+    Sincroniza metadata.json con lo que realmente tiene cada nodo.
+    Agrega archivos desconocidos, quita réplicas que ya no existen,
+    detecta copias dañadas y vuelve a replicar lo que tenga menos de 2 copias.
+    ---
+    tags:
+      - Mantenimiento
+    produces:
+      - application/json
+    responses:
+      200:
+        description: Resumen de los cambios.
+        schema:
+          type: object
+          properties:
+            added:
+              type: array
+              items:
+                type: object
+            removed:
+              type: array
+              items:
+                type: object
+            conflicts:
+              type: array
+              items:
+                type: object
+            lost:
+              type: array
+              items:
+                type: string
+            replicated:
+              type: array
+              items:
+                type: object
+            under_replicated:
+              type: array
+              items:
+                type: object
+            unreachable:
+              type: array
+              items:
+                type: string
+            deleted:
+              type: array
+              items:
+                type: string
+    """
+    return jsonify(sync_metadata())
+
+
+def sync_loop():
+    """Sincroniza al arrancar y luego cada SYNC_INTERVAL segundos."""
+    while True:
+        try:
+            sync_metadata()
+        except Exception as error:  # el hilo no debe morir por un error puntual
+            log_event(f"Error al sincronizar: {error}")
+        time.sleep(SYNC_INTERVAL)
 
 
 def parse_arguments():
@@ -511,4 +909,6 @@ if __name__ == "__main__":
 
     print(f"Iniciando coordinador en {args.ip}, puerto {args.puerto}")
     print(f"Réplicas por archivo: {REPLICAS}")
+    print(f"Sincronización con los nodos cada {SYNC_INTERVAL:g} s")
+    threading.Thread(target=sync_loop, daemon=True).start()
     app.run(host=args.ip, port=args.puerto)
