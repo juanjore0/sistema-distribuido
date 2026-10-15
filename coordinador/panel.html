@@ -143,6 +143,8 @@
     .copy.ok { background: var(--ok-soft); color: var(--ok); }
     .copy.down { background: var(--down-soft); color: var(--down); }
     .copy.none { color: var(--border); }
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; color: var(--muted); font-size: 12px; align-items: center; }
+    .legend .copy { width: 20px; height: 20px; line-height: 20px; font-size: 11px; text-align: center; margin-right: 4px; }
     .actions { display: flex; gap: 6px; justify-content: flex-end; }
     td:first-child { min-width: 150px; }
     @media (max-width: 560px) {
@@ -219,6 +221,11 @@
           <thead id="thead"></thead>
           <tbody id="tbody"></tbody>
         </table>
+      </div>
+      <div class="legend">
+        <span><span class="copy ok">✓</span>Copia en un nodo activo</span>
+        <span><span class="copy down">✓</span>Copia en un nodo caído</span>
+        <span><span class="copy none">—</span>Sin copia</span>
       </div>
     </section>
   </div>
@@ -338,7 +345,7 @@
             el("span", {
               class: `copy ${ok ? "ok" : "down"}`,
               title: ok ? `Copia en ${node.id}` : `Copia en ${node.id} (caído)`,
-            }, ok ? "✓" : "✕"));
+            }, "✓"));
         }),
         el("td", {},
           el("div", { class: "actions" },

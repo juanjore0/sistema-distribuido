@@ -10,7 +10,6 @@ DEFAULT_IP = os.getenv("COORDINATOR_IP", "127.0.0.1")
 DEFAULT_PORT = int(os.getenv("COORDINATOR_PORT", "4000"))
 REQUEST_TIMEOUT = float(os.getenv("COORDINATOR_REQUEST_TIMEOUT", "5"))
 
-
 def check_coordinator(url):
     response = requests.get(
         f"{url.rstrip('/')}/health",
