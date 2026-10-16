@@ -30,6 +30,12 @@ NODE_ID=nodo1 PORT=3000 python3 nodo/nodo.py
 {"status": "ok", "service": "nodo", "node_id": "nodo1", "hostname": "PC-VALERIA", "port": 3000}
 ```
 
+Puedes comprobar el endpoint directamente desde PowerShell:
+
+```powershell
+Invoke-RestMethod http://localhost:3000/health
+```
+
 Inicia el coordinador en otra terminal:
 
 ```powershell
