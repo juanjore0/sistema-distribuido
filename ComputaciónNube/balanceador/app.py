@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 
-NODOS = [u.strip() for u in os.getenv("NODOS", "http://ia-node-1:8000").split(",") if u.strip()]
+NODOS = [u.strip() for u in os.getenv("NODOS", "http://localhost:8001").split(",") if u.strip()]
 INTERVALO_HC = float(os.getenv("INTERVALO_HC", "1.0"))
 TIMEOUT_INFERENCIA = float(os.getenv("TIMEOUT_INFERENCIA", "60"))
 MAX_REINTENTOS = int(os.getenv("MAX_REINTENTOS", "2"))

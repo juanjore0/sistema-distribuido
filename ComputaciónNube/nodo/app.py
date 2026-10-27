@@ -58,6 +58,6 @@ async def inferir(c: Consulta):
 
 @app.post("/crash")
 async def crash():
-    """Simula una caída abrupta del proceso (Docker lo reinicia por la política restart)."""
+    """Simula una caída abrupta del proceso (el lanzador lo reinicia, como haría un orquestador)."""
     asyncio.get_running_loop().call_later(0.05, os._exit, 1)
     return {"nodo": NODE_ID, "estado": "cayendo"}
