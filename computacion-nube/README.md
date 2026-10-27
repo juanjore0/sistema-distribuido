@@ -65,3 +65,11 @@ Luego `iniciar 2` → vuelve al pool (RECUPERADO).
 
 Los resultados quedan en `resultados/` (un CSV por escenario + `resumen.csv` + gráficas PNG): esa es la evidencia verificable.
 Los tiempos varían un poco entre corridas porque la duración de cada inferencia es aleatoria.
+
+
+Cómo se usa:
+
+Una sola vez: pip install -r requirements.txt.
+En una terminal: python iniciar.py. Levanta los tres nodos y los dos balanceadores, cada uno como un proceso aparte, y hace el trabajo que hacía Docker: si un nodo se cae solo, lo vuelve a levantar en un segundo.
+En esa misma terminal se escribe parar 2 o iniciar 2 para la caída en vivo, en vez de docker stop. Ahí mismo salen los avisos de que el nodo cayó y de que se recuperó.
+En otra terminal se corren las pruebas con python simular.py, igual que antes.
