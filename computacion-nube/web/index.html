@@ -1,0 +1,1801 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Grupo 6 | Monitor de infraestructura IA</title>
+
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #0b1020;
+            --sidebar: #0d1426;
+            --panel: #121b2e;
+            --panel-alt: #172238;
+            --border: #26344d;
+            --text: #e7edf8;
+            --muted: #8b9ab4;
+            --blue: #6b9cff;
+            --blue-bg: #1c3155;
+            --green: #46d6a0;
+            --red: #ff777f;
+            --yellow: #f5c66b;
+            --radius: 15px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background:
+                radial-gradient(ellipse at 85% 0%, #192747 0, transparent 38%),
+                var(--bg);
+            color: var(--text);
+            font-family: Inter, "Segoe UI", Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        button, select {
+            font: inherit;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+
+        .app {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 225px minmax(0, 1fr);
+        }
+
+        /* BARRA LATERAL */
+
+        .sidebar {
+            background: var(--sidebar);
+            border-right: 1px solid var(--border);
+            padding: 25px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            padding: 0 7px;
+        }
+
+        .logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            background: linear-gradient(135deg, #477cff, #815cff);
+            color: white;
+            font-weight: 900;
+            font-size: 16px;
+        }
+
+        .brand-name {
+            font-size: 15px;
+            font-weight: 800;
+        }
+
+        .brand small {
+            display: block;
+            color: var(--muted);
+            font-size: 9px;
+            letter-spacing: .1em;
+        }
+
+        .nav-title {
+            color: var(--muted);
+            font-size: 10px;
+            letter-spacing: .14em;
+            padding: 0 10px;
+            margin-bottom: 8px;
+        }
+
+        .nav-item {
+            padding: 11px;
+            margin-bottom: 5px;
+            color: #aebbd1;
+            border-radius: 9px;
+            font-size: 12px;
+        }
+
+        .nav-item.active {
+            background: var(--blue-bg);
+            color: #b8d0ff;
+            border: 1px solid #2b4773;
+        }
+
+        .side-note {
+            margin-top: auto;
+            padding: 13px;
+            border: 1px solid var(--border);
+            background: #101a2c;
+            border-radius: 11px;
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .side-note strong {
+            display: block;
+            color: var(--text);
+            margin-bottom: 5px;
+        }
+
+        /* CONTENIDO PRINCIPAL */
+
+        main {
+            min-width: 0;
+            padding: 27px clamp(15px, 3vw, 38px);
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 23px;
+        }
+
+        .eyebrow {
+            color: var(--blue);
+            text-transform: uppercase;
+            letter-spacing: .13em;
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        h1 {
+            margin: 5px 0 0;
+            font-size: clamp(22px, 3vw, 30px);
+            letter-spacing: -.04em;
+        }
+
+        h2 {
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 11px;
+            margin: 5px 0 0;
+        }
+
+        .top-actions {
+            display: flex;
+            gap: 9px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .connection-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            padding: 9px 12px;
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            background: var(--yellow);
+        }
+
+        .dot.good {
+            background: var(--green);
+        }
+
+        .dot.bad {
+            background: var(--red);
+        }
+
+        .dot.warn {
+            background: var(--yellow);
+        }
+
+        .button {
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            padding: 9px 13px;
+            background: var(--panel-alt);
+            color: var(--text);
+            font-weight: 700;
+            font-size: 11px;
+        }
+
+        .button:hover {
+            filter: brightness(1.15);
+        }
+
+        .button.primary {
+            background: #356fe8;
+            border-color: #477fff;
+            color: white;
+        }
+
+        .button:disabled {
+            filter: none;
+        }
+
+        .notice {
+            border: 1px solid #35445e;
+            background: #121d31;
+            color: #b9c7dd;
+            padding: 12px 14px;
+            border-radius: 11px;
+            margin-bottom: 16px;
+            font-size: 11px;
+        }
+
+        .notice strong {
+            color: var(--blue);
+        }
+
+        /* TARJETAS */
+
+        .grid {
+            display: grid;
+            gap: 13px;
+        }
+
+        .kpis {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            margin-bottom: 15px;
+        }
+
+        .card {
+            background: linear-gradient(145deg, #141e32, #111a2c);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 17px;
+            min-width: 0;
+            box-shadow: 0 12px 35px #00000012;
+        }
+
+        .kpi-label {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .kpi-value {
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -.04em;
+            margin: 8px 0 3px;
+            overflow-wrap: anywhere;
+        }
+
+        .kpi-foot {
+            color: var(--muted);
+            font-size: 10px;
+        }
+
+        .layout-two {
+            grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr);
+            margin-bottom: 15px;
+        }
+
+        .layout-three {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            margin-bottom: 15px;
+        }
+
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .tag {
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            padding: 5px 9px;
+            font-size: 10px;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        /* SELECTORES */
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 13px;
+        }
+
+        .field label {
+            display: block;
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+
+        .field select {
+            width: 100%;
+            min-width: 0;
+            border: 1px solid #33435e;
+            background: #0d1628;
+            color: var(--text);
+            border-radius: 9px;
+            padding: 10px;
+            outline: none;
+        }
+
+        .field select:focus {
+            border-color: var(--blue);
+        }
+
+        .field select option {
+            background: #111a2c;
+            color: var(--text);
+        }
+
+        .status-line {
+            color: var(--muted);
+            font-size: 11px;
+            min-height: 18px;
+            margin-top: 10px;
+        }
+
+        /* NODOS */
+
+        .node-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .node {
+            background: #0e1728;
+            border: 1px solid var(--border);
+            border-radius: 11px;
+            padding: 12px;
+            min-width: 0;
+        }
+
+        .node-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 7px;
+            flex-wrap: wrap;
+        }
+
+        .node-name {
+            font-weight: 800;
+            font-size: 12px;
+        }
+
+        .badge {
+            display: inline-block;
+            border-radius: 100px;
+            padding: 4px 7px;
+            font-size: 9px;
+            font-weight: 800;
+        }
+
+        .badge.good {
+            color: var(--green);
+            background: #14392f;
+        }
+
+        .badge.bad {
+            color: var(--red);
+            background: #411f2a;
+        }
+
+        .badge.warn {
+            color: var(--yellow);
+            background: #40351e;
+        }
+
+        .node-url {
+            color: var(--muted);
+            font-size: 10px;
+            margin: 8px 0;
+            overflow-wrap: anywhere;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            border-top: 1px solid #25334a;
+            padding: 7px 0;
+            font-size: 10px;
+            color: var(--muted);
+        }
+
+        .metric strong {
+            color: var(--text);
+        }
+
+        .events {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            max-height: 190px;
+            overflow-y: auto;
+        }
+
+        .event {
+            border: 1px solid var(--border);
+            border-left: 3px solid #64748b;
+            border-radius: 7px;
+            padding: 8px 10px;
+            background: #0e1728;
+            color: #b8c5d9;
+            font: 10px/1.5 Consolas, monospace;
+            overflow-wrap: anywhere;
+        }
+
+        .event.down {
+            border-left-color: var(--red);
+        }
+
+        .event.up {
+            border-left-color: var(--green);
+        }
+
+        /* ESCENARIO HISTÓRICO */
+
+        .scenario-description {
+            margin-bottom: 16px;
+            border: 1px solid #2c4162;
+            background: #101c31;
+            padding: 13px;
+            border-radius: 10px;
+        }
+
+        .scenario-title {
+            font-weight: 800;
+            font-size: 14px;
+        }
+
+        .scenario-detail {
+            color: var(--muted);
+            font-size: 11px;
+            margin-top: 5px;
+        }
+
+        .scenario-kpis {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .mini-card {
+            background: #0e1728;
+            border: 1px solid var(--border);
+            border-radius: 11px;
+            padding: 13px;
+            min-width: 0;
+        }
+
+        .mini-label {
+            font-size: 10px;
+            color: var(--muted);
+        }
+
+        .mini-value {
+            font-size: 21px;
+            font-weight: 800;
+            margin-top: 5px;
+            overflow-wrap: anywhere;
+        }
+
+        .mini-unit {
+            font-size: 10px;
+            color: var(--muted);
+        }
+
+        /* GRÁFICAS */
+
+        .chart-box {
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .chart-box svg {
+            width: 100%;
+            height: auto;
+            display: block;
+            min-height: 180px;
+        }
+
+        .chart-note {
+            color: var(--muted);
+            font-size: 10px;
+            margin-top: 7px;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-color {
+            width: 9px;
+            height: 9px;
+            border-radius: 3px;
+        }
+
+        /* TABLAS */
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 650px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 10px 9px;
+            border-bottom: 1px solid var(--border);
+            font-size: 10px;
+            white-space: nowrap;
+        }
+
+        th {
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            font-size: 9px;
+            font-weight: 800;
+        }
+
+        tbody tr:hover {
+            background: #1a2740;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .empty {
+            padding: 22px 10px;
+            color: var(--muted);
+            text-align: center;
+            font-size: 11px;
+        }
+
+        details {
+            margin-top: 12px;
+        }
+
+        details summary {
+            color: var(--muted);
+            font-size: 10px;
+            cursor: pointer;
+        }
+
+        pre {
+            background: #0a1220;
+            border: 1px solid var(--border);
+            color: #c7d5ec;
+            padding: 12px;
+            border-radius: 9px;
+            font-size: 10px;
+            overflow: auto;
+            max-height: 250px;
+        }
+
+        .footer {
+            text-align: center;
+            color: var(--muted);
+            font-size: 10px;
+            padding: 22px 5px 5px;
+        }
+
+        .toast {
+            display: none;
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            max-width: min(380px, calc(100vw - 36px));
+            background: #233754;
+            border: 1px solid #42618b;
+            color: white;
+            padding: 13px 16px;
+            border-radius: 11px;
+            box-shadow: 0 12px 35px #0008;
+            z-index: 10;
+            font-size: 12px;
+        }
+
+        @media (max-width: 1200px) {
+            .kpis {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .layout-three {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .layout-two {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .app {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                padding: 12px;
+                gap: 12px;
+            }
+
+            .nav, .side-note {
+                display: none;
+            }
+
+            main {
+                padding: 15px;
+            }
+
+            .kpis {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .layout-three {
+                grid-template-columns: 1fr;
+            }
+
+            .node-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .scenario-kpis {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .controls {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div class="app">
+
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="logo">G6</div>
+            <div>
+                <div class="brand-name">Nube e IA</div>
+                <small>LABORATORIO DISTRIBUIDO</small>
+            </div>
+        </div>
+
+        <nav class="nav">
+            <div class="nav-title">MONITORIZACIÓN</div>
+            <div class="nav-item active">▦ &nbsp; Vista general</div>
+            <div class="nav-item">⇄ &nbsp; Balanceo de carga</div>
+            <div class="nav-item">◉ &nbsp; Disponibilidad de nodos</div>
+            <div class="nav-item">▤ &nbsp; Resultados históricos</div>
+        </nav>
+
+        <div class="side-note">
+            <strong>Infraestructura simulada</strong>
+            Este panel permite observar el balanceador, la disponibilidad de los nodos y los resultados de pruebas anteriores.
+        </div>
+    </aside>
+
+    <main>
+        <header class="topbar">
+            <div>
+                <div class="eyebrow">Sistema distribuido · Grupo 6</div>
+                <h1>Monitor de infraestructura IA</h1>
+                <p class="subtitle">Disponibilidad, balanceo y análisis de rendimiento</p>
+            </div>
+
+            <div class="top-actions">
+                <div class="connection-pill">
+                    <span id="globalDot" class="dot warn"></span>
+                    <span id="globalStatus">Conectando...</span>
+                </div>
+                <button class="button" id="refreshButton">Actualizar</button>
+            </div>
+        </header>
+
+        <div class="notice">
+            <strong>Datos en vivo e históricos:</strong>
+            el estado de los nodos se consulta al balanceador seleccionado.
+            Los escenarios históricos se leen de los CSV y no generan solicitudes nuevas.
+        </div>
+
+        <!-- MÉTRICAS EN VIVO -->
+
+        <section class="grid kpis">
+            <div class="card">
+                <div class="kpi-label">Nodos disponibles</div>
+                <div class="kpi-value" id="kHealthy">—</div>
+                <div class="kpi-foot">Resultado de los health checks</div>
+            </div>
+
+            <div class="card">
+                <div class="kpi-label">Solicitudes activas</div>
+                <div class="kpi-value" id="kActive">—</div>
+                <div class="kpi-foot">Solicitudes actualmente en proceso</div>
+            </div>
+
+            <div class="card">
+                <div class="kpi-label">Solicitudes atendidas</div>
+                <div class="kpi-value" id="kServed">—</div>
+                <div class="kpi-foot">Contador del balanceador</div>
+            </div>
+
+            <div class="card">
+                <div class="kpi-label">Fallos de nodo</div>
+                <div class="kpi-value" id="kFailures">—</div>
+                <div class="kpi-foot">Fallos registrados por los nodos</div>
+            </div>
+
+            <div class="card">
+                <div class="kpi-label">Algoritmo activo</div>
+                <div class="kpi-value" id="kAlgo">—</div>
+                <div class="kpi-foot">RR o LC</div>
+            </div>
+        </section>
+
+        <!-- ESTADO Y CONFIGURACIÓN -->
+
+        <section class="grid layout-two">
+            <div class="card">
+                <div class="section-head">
+                    <div>
+                        <h2>Estado de los nodos</h2>
+                        <p class="subtitle" id="nodeCaption">Esperando respuesta del balanceador...</p>
+                    </div>
+                    <span class="tag">Actualización automática</span>
+                </div>
+
+                <div id="nodes" class="node-grid">
+                    <div class="empty">Consultando disponibilidad...</div>
+                </div>
+
+                <details>
+                    <summary>Ver respuesta JSON de /estado</summary>
+                    <pre id="rawState">Sin datos</pre>
+                </details>
+            </div>
+
+            <div class="card">
+                <div class="section-head">
+                    <div>
+                        <h2>Configuración</h2>
+                        <p class="subtitle">Selecciona qué infraestructura deseas observar.</p>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <div class="field">
+                        <label for="target">INFRAESTRUCTURA</label>
+                        <select id="target">
+                            <option value="8080">Cluster distribuido · 3 nodos</option>
+                            <option value="8081">Línea base · 1 nodo</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label for="algorithm">ALGORITMO DE BALANCEO</label>
+                        <select id="algorithm">
+                            <option value="rr">Round Robin</option>
+                            <option value="lc">Least Connections</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="button primary" id="applyAlgorithm">
+                    Aplicar algoritmo
+                </button>
+
+                <div class="status-line" id="configStatus">
+                    El algoritmo se aplica al balanceador que sirve esta página.
+                </div>
+
+                <div style="height:1px;background:var(--border);margin:20px 0;"></div>
+
+                <div class="section-head">
+                    <div>
+                        <h2>Eventos recientes</h2>
+                        <p class="subtitle">Caídas y recuperaciones detectadas.</p>
+                    </div>
+                </div>
+
+                <div id="events" class="events">
+                    <div class="empty">Sin eventos reportados.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- RESULTADOS HISTÓRICOS -->
+
+        <section class="card" style="margin-bottom:15px;">
+            <div class="section-head">
+                <div>
+                    <h2>Análisis histórico</h2>
+                    <p class="subtitle">
+                        Elige un escenario para consultar únicamente sus métricas y gráficas.
+                    </p>
+                </div>
+
+                <button class="button" id="reloadHistory">Recargar históricos</button>
+            </div>
+
+            <div class="controls">
+                <div class="field">
+                    <label for="scenarioSelect">ESCENARIO</label>
+                    <select id="scenarioSelect">
+                        <option value="A_1nodo_100">A · Ráfaga, 1 nodo</option>
+                        <option value="B_3nodos_rr_100">B · Ráfaga, 3 nodos RR</option>
+                        <option value="C_3nodos_lc_100">C · Ráfaga, 3 nodos LC</option>
+                        <option value="D_caida_nodo2_100">D · Caída de nodo 2</option>
+                        <option value="E_1nodo_poisson6">E1 · Poisson, 1 nodo</option>
+                        <option value="E_3nodos_rr_poisson6">E2 · Poisson, 3 nodos RR</option>
+                        <option value="E_3nodos_lc_poisson6">E3 · Poisson, 3 nodos LC</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label>ARCHIVO DE RESULTADOS</label>
+                    <select id="sourceInfo" disabled>
+                        <option>Esperando datos...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="scenario-description">
+                <div class="scenario-title" id="selectedTitle">Cargando escenario...</div>
+                <div class="scenario-detail" id="selectedDescription">
+                    Consultando resultados históricos.
+                </div>
+            </div>
+
+            <div class="scenario-kpis">
+                <div class="mini-card">
+                    <div class="mini-label">Solicitudes exitosas</div>
+                    <div class="mini-value" id="hSuccess">—</div>
+                    <div class="mini-unit" id="hSuccessRate">Éxito</div>
+                </div>
+
+                <div class="mini-card">
+                    <div class="mini-label">Latencia media</div>
+                    <div class="mini-value" id="hAvg">—</div>
+                    <div class="mini-unit">Segundos por solicitud</div>
+                </div>
+
+                <div class="mini-card">
+                    <div class="mini-label">Percentil 95 (p95)</div>
+                    <div class="mini-value" id="hP95">—</div>
+                    <div class="mini-unit">Segundos</div>
+                </div>
+
+                <div class="mini-card">
+                    <div class="mini-label">Throughput</div>
+                    <div class="mini-value" id="hThroughput">—</div>
+                    <div class="mini-unit">Solicitudes por segundo</div>
+                </div>
+            </div>
+
+            <div class="grid layout-three">
+                <div class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Latencia</h2>
+                            <p class="subtitle">Media frente a p95.</p>
+                        </div>
+                    </div>
+                    <div id="chartLatency" class="chart-box"></div>
+                </div>
+
+                <div class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Tiempo total</h2>
+                            <p class="subtitle">Duración de la prueba.</p>
+                        </div>
+                    </div>
+                    <div id="chartTotal" class="chart-box"></div>
+                </div>
+
+                <div class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Throughput</h2>
+                            <p class="subtitle">Solicitudes por segundo.</p>
+                        </div>
+                    </div>
+                    <div id="chartThroughput" class="chart-box"></div>
+                </div>
+            </div>
+
+            <div class="grid layout-two">
+                <div class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Distribución por nodo</h2>
+                            <p class="subtitle">Solicitudes atendidas por cada servidor.</p>
+                        </div>
+                    </div>
+
+                    <div id="chartDistribution" class="chart-box"></div>
+                </div>
+
+                <div class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Resumen del escenario</h2>
+                            <p class="subtitle">Métricas complementarias.</p>
+                        </div>
+                    </div>
+
+                    <div class="metric">
+                        <span>Solicitudes totales</span>
+                        <strong id="hTotalRequests">—</strong>
+                    </div>
+
+                    <div class="metric">
+                        <span>Tiempo total</span>
+                        <strong id="hTotalTime">—</strong>
+                    </div>
+
+                    <div class="metric">
+                        <span>Latencia máxima</span>
+                        <strong id="hMax">—</strong>
+                    </div>
+
+                    <div class="metric">
+                        <span>Reintentos</span>
+                        <strong id="hRetries">—</strong>
+                    </div>
+
+                    <div class="metric">
+                        <span>Origen del dato</span>
+                        <strong id="hSource">—</strong>
+                    </div>
+
+                    <p class="chart-note">
+                        Si el dato proviene de la bitácora, es un resumen agregado:
+                        no representa las filas de un CSV que no existe.
+                    </p>
+                </div>
+            </div>
+
+            <div class="section-head" style="margin-top:20px;">
+                <div>
+                    <h2>Solicitudes del escenario seleccionado</h2>
+                    <p class="subtitle" id="detailCaption">
+                        El detalle estará disponible cuando exista el CSV correspondiente.
+                    </p>
+                </div>
+            </div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Resultado</th>
+                            <th>Nodo</th>
+                            <th>Latencia</th>
+                            <th>Espera de cola</th>
+                            <th>Inferencia</th>
+                            <th>Reintentos</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detailRows">
+                        <tr>
+                            <td colspan="7" class="empty">Cargando resultados...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="footer">
+            Grupo 6 · Computación en la nube y retos de los sistemas distribuidos en la era de la IA
+        </div>
+    </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+/* ---------------------------------------------------------
+   CONFIGURACIÓN GENERAL
+--------------------------------------------------------- */
+
+const $ = id => document.getElementById(id);
+
+const SCENARIOS = [
+    {
+        id: "A_1nodo_100",
+        title: "A · Ráfaga, 1 nodo",
+        description: "Línea base con un nodo y 100 solicitudes enviadas en ráfaga."
+    },
+    {
+        id: "B_3nodos_rr_100",
+        title: "B · Ráfaga, 3 nodos RR",
+        description: "Tres nodos de inferencia con algoritmo Round Robin."
+    },
+    {
+        id: "C_3nodos_lc_100",
+        title: "C · Ráfaga, 3 nodos LC",
+        description: "Tres nodos de inferencia con algoritmo Least Connections."
+    },
+    {
+        id: "D_caida_nodo2_100",
+        title: "D · Caída de nodo 2",
+        description: "Prueba de tolerancia a fallos mientras un nodo deja de estar disponible."
+    },
+    {
+        id: "E_1nodo_poisson6",
+        title: "E1 · Poisson, 1 nodo",
+        description: "Línea base con llegadas escalonadas de aproximadamente seis solicitudes por segundo."
+    },
+    {
+        id: "E_3nodos_rr_poisson6",
+        title: "E2 · Poisson, 3 nodos RR",
+        description: "Tres nodos y algoritmo Round Robin con llegadas escalonadas."
+    },
+    {
+        id: "E_3nodos_lc_poisson6",
+        title: "E3 · Poisson, 3 nodos LC",
+        description: "Tres nodos y algoritmo Least Connections con llegadas escalonadas."
+    }
+];
+
+const state = {
+    scenarios: [],
+    currentState: null,
+    historyLoaded: false,
+    loadingHistory: false
+};
+
+function escapeHTML(value) {
+    return String(value ?? "").replace(/[&<>"']/g, character => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    })[character]);
+}
+
+function formatNumber(value, decimals = 2) {
+    if (value === null || value === undefined || value === "") {
+        return "—";
+    }
+
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+        return "—";
+    }
+
+    return number.toLocaleString("es-CO", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+    });
+}
+
+function formatSeconds(value) {
+    const result = formatNumber(value, 2);
+    return result === "—" ? result : result + " s";
+}
+
+function algorithmName(value) {
+    return value === "lc" ? "Least Connections" : "Round Robin";
+}
+
+function showToast(message) {
+    const toast = $("toast");
+    toast.textContent = message;
+    toast.style.display = "block";
+
+    clearTimeout(showToast.timer);
+
+    showToast.timer = setTimeout(() => {
+        toast.style.display = "none";
+    }, 3500);
+}
+
+function nodeLabel(url) {
+    const match = String(url).match(/:(\d+)/);
+
+    if (!match) {
+        return url;
+    }
+
+    const labels = {
+        "8001": "ia-node-1",
+        "8002": "ia-node-2",
+        "8003": "ia-node-3"
+    };
+
+    return labels[match[1]] || url;
+}
+
+/* ---------------------------------------------------------
+   CAMBIO DE BALANCEADOR
+--------------------------------------------------------- */
+
+function currentPort() {
+    return location.port || "80";
+}
+
+function updateTargetSelector() {
+    const port = currentPort();
+
+    if (port === "8080" || port === "8081") {
+        $("target").value = port;
+    }
+}
+
+$("target").addEventListener("change", () => {
+    const port = $("target").value;
+
+    if (port !== "8080" && port !== "8081") {
+        return;
+    }
+
+    if (port === currentPort()) {
+        return;
+    }
+
+    /*
+     * Cambiar el origen completo garantiza que /estado, /config
+     * y /dashboard-api/resultados consulten la instancia seleccionada.
+     */
+    location.href = `${location.protocol}//${location.hostname}:${port}/dashboard`;
+});
+
+/* ---------------------------------------------------------
+   ESTADO EN VIVO: GET /estado
+--------------------------------------------------------- */
+
+async function refreshState() {
+    try {
+        const response = await fetch("/estado", {
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+        }
+
+        const data = await response.json();
+        state.currentState = data;
+
+        renderState(data);
+    } catch (error) {
+        $("globalDot").className = "dot bad";
+        $("globalStatus").textContent = "Sin conexión";
+
+        $("nodeCaption").textContent =
+            "No se pudo consultar GET /estado. Comprueba que el balanceador esté ejecutándose.";
+
+        $("nodes").innerHTML =
+            '<div class="empty">No se pudo conectar con el balanceador. Abre el panel desde http://127.0.0.1:8080/dashboard o http://127.0.0.1:8081/dashboard.</div>';
+
+        $("rawState").textContent = error.message;
+    }
+}
+
+function renderState(data) {
+    const nodes = Object.entries(data.nodos || {});
+    const healthy = nodes.filter(([, node]) => node.sano).length;
+
+    const allHealthy = nodes.length > 0 && healthy === nodes.length;
+    const someHealthy = healthy > 0;
+
+    $("globalDot").className =
+        "dot " + (allHealthy ? "good" : someHealthy ? "warn" : "bad");
+
+    $("globalStatus").textContent =
+        healthy + "/" + nodes.length + " nodos disponibles";
+
+    $("kHealthy").textContent = healthy + "/" + nodes.length;
+
+    $("kActive").textContent = nodes.reduce(
+        (total, [, node]) => total + Number(node.activas || 0), 0
+    );
+
+    $("kServed").textContent = nodes.reduce(
+        (total, [, node]) => total + Number(node.atendidas || 0), 0
+    );
+
+    $("kFailures").textContent = nodes.reduce(
+        (total, [, node]) => total + Number(node.fallos || 0), 0
+    );
+
+    $("kAlgo").textContent = String(data.algoritmo || "rr").toUpperCase();
+
+    $("nodeCaption").textContent =
+        nodes.length + " nodos configurados · " +
+        algorithmName(data.algoritmo);
+
+    $("nodes").innerHTML = nodes.map(([url, node]) => {
+        const healthyNode = Boolean(node.sano);
+
+        return `
+            <div class="node">
+                <div class="node-head">
+                    <span class="node-name">${escapeHTML(nodeLabel(url))}</span>
+                    <span class="badge ${healthyNode ? "good" : "bad"}">
+                        ${healthyNode ? "DISPONIBLE" : "CAÍDO"}
+                    </span>
+                </div>
+
+                <div class="node-url">${escapeHTML(url)}</div>
+
+                <div class="metric">
+                    <span>Solicitudes activas</span>
+                    <strong>${Number(node.activas || 0)}</strong>
+                </div>
+
+                <div class="metric">
+                    <span>Atendidas</span>
+                    <strong>${Number(node.atendidas || 0)}</strong>
+                </div>
+
+                <div class="metric">
+                    <span>Fallos registrados</span>
+                    <strong>${Number(node.fallos || 0)}</strong>
+                </div>
+
+                <div class="metric">
+                    <span>En el pool</span>
+                    <strong>${healthyNode ? "Sí" : "No"}</strong>
+                </div>
+            </div>
+        `;
+    }).join("") || '<div class="empty">No hay nodos configurados.</div>';
+
+    const events = data.eventos || [];
+
+    $("events").innerHTML = events.length
+        ? events.slice().reverse().map(event => {
+            const text = String(event);
+            let type = "";
+
+            if (text.includes("CAIDO")) type = "down";
+            if (text.includes("RECUPERADO")) type = "up";
+
+            return `<div class="event ${type}">${escapeHTML(text)}</div>`;
+        }).join("")
+        : '<div class="empty">No hay eventos de caída o recuperación.</div>';
+
+    $("rawState").textContent = JSON.stringify(data, null, 2);
+
+    /*
+     * Si el usuario no ha cambiado manualmente el algoritmo en el
+     * selector, sincronizamos el selector con el valor del servidor.
+     */
+    if (!$("algorithm").dataset.userChanged) {
+        $("algorithm").value = data.algoritmo || "rr";
+    }
+}
+
+$("algorithm").addEventListener("change", () => {
+    $("algorithm").dataset.userChanged = "true";
+});
+
+$("applyAlgorithm").addEventListener("click", async () => {
+    const algorithm = $("algorithm").value;
+    const button = $("applyAlgorithm");
+
+    button.disabled = true;
+    $("configStatus").textContent = "Aplicando configuración...";
+
+    try {
+        const response = await fetch("/config", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                algoritmo: algorithm
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error("El servidor respondió HTTP " + response.status);
+        }
+
+        const result = await response.json();
+
+        $("algorithm").value = result.algoritmo || algorithm;
+        $("algorithm").dataset.userChanged = "true";
+
+        $("configStatus").textContent =
+            "Algoritmo aplicado: " + algorithmName(result.algoritmo || algorithm) + ".";
+
+        showToast("Se actualizó el algoritmo de balanceo.");
+
+        await refreshState();
+    } catch (error) {
+        $("configStatus").textContent = "No se pudo aplicar el algoritmo: " + error.message;
+        showToast("Error al actualizar la configuración.");
+    } finally {
+        button.disabled = false;
+    }
+});
+
+/* ---------------------------------------------------------
+   RESULTADOS HISTÓRICOS
+   GET /dashboard-api/resultados
+--------------------------------------------------------- */
+
+async function loadHistory() {
+    if (state.loadingHistory) {
+        return;
+    }
+
+    state.loadingHistory = true;
+    $("reloadHistory").disabled = true;
+
+    try {
+        const response = await fetch("/dashboard-api/resultados", {
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+        }
+
+        const data = await response.json();
+
+        state.scenarios = data.scenarios || [];
+        state.historyLoaded = true;
+
+        renderSelectedScenario();
+    } catch (error) {
+        $("selectedTitle").textContent = "No se pudieron cargar los resultados";
+        $("selectedDescription").textContent =
+            "Comprueba que exista la ruta /dashboard-api/resultados y que el balanceador esté ejecutándose.";
+
+        $("sourceInfo").innerHTML = "<option>Error de conexión</option>";
+
+        $("detailRows").innerHTML = `
+            <tr>
+                <td colspan="7" class="empty">
+                    ${escapeHTML(error.message)}
+                </td>
+            </tr>
+        `;
+
+        [
+            "chartLatency",
+            "chartTotal",
+            "chartThroughput",
+            "chartDistribution"
+        ].forEach(id => {
+            $(id).innerHTML = '<div class="empty">No se pudieron cargar los datos.</div>';
+        });
+    } finally {
+        state.loadingHistory = false;
+        $("reloadHistory").disabled = false;
+    }
+}
+
+function getSelectedScenario() {
+    const id = $("scenarioSelect").value;
+    return state.scenarios.find(item => item.id === id);
+}
+
+function renderSelectedScenario() {
+    const id = $("scenarioSelect").value;
+    const scenario = state.scenarios.find(item => {
+        /*
+         * El endpoint actual devuelve el identificador en el nombre
+         * del archivo, por ejemplo A_1nodo_100.csv.
+         */
+        return item.file === id + ".csv";
+    });
+
+    if (!scenario) {
+        renderMissingScenario(id);
+        return;
+    }
+
+    renderScenario(scenario);
+}
+
+function renderMissingScenario(id) {
+    const definition = SCENARIOS.find(item => item.id === id);
+
+    $("selectedTitle").textContent =
+        definition ? definition.title : "Escenario no encontrado";
+
+    $("selectedDescription").textContent =
+        "El servidor no devolvió información para este escenario.";
+
+    $("sourceInfo").innerHTML = "<option>No disponible</option>";
+
+    [
+        "hSuccess",
+        "hAvg",
+        "hP95",
+        "hThroughput",
+        "hTotalRequests",
+        "hTotalTime",
+        "hMax",
+        "hRetries",
+        "hSource"
+    ].forEach(elementId => {
+        $(elementId).textContent = "—";
+    });
+
+    $("hSuccessRate").textContent = "Sin datos";
+
+    [
+        "chartLatency",
+        "chartTotal",
+        "chartThroughput",
+        "chartDistribution"
+    ].forEach(elementId => {
+        $(elementId).innerHTML =
+            '<div class="empty">No hay datos disponibles para este escenario.</div>';
+    });
+
+    $("detailCaption").textContent = "No hay detalles disponibles.";
+
+    $("detailRows").innerHTML =
+        '<tr><td colspan="7" class="empty">No se encontraron resultados.</td></tr>';
+}
+
+function renderScenario(scenario) {
+    const definition = SCENARIOS.find(item => item.id + ".csv" === scenario.file);
+
+    $("selectedTitle").textContent = scenario.title || (definition && definition.title) || scenario.file;
+
+    $("selectedDescription").textContent =
+        (definition ? definition.description + " " : "") +
+        (scenario.source === "csv"
+            ? "Los valores se calculan a partir del archivo CSV disponible."
+            : scenario.source === "bitacora"
+                ? "Se muestran métricas agregadas de la bitácora; no hay detalle por solicitud."
+                : "Fuente de datos no identificada.");
+
+    $("sourceInfo").innerHTML = `
+        <option>${escapeHTML(scenario.file || "Sin archivo")}</option>
+    `;
+
+    if (!scenario.available) {
+        renderMissingScenario($("scenarioSelect").value);
+        return;
+    }
+
+    $("hSuccess").textContent =
+        Number(scenario.success || 0) + "/" + Number(scenario.n || 0);
+
+    $("hSuccessRate").textContent =
+        formatNumber(scenario.successRate, 1) + "% de éxito";
+
+    $("hAvg").textContent = formatNumber(scenario.avg);
+    $("hP95").textContent = formatNumber(scenario.p95);
+    $("hThroughput").textContent = formatNumber(scenario.throughput);
+
+    $("hTotalRequests").textContent = Number(scenario.n || 0);
+    $("hTotalTime").textContent = formatSeconds(scenario.total);
+    $("hMax").textContent = formatSeconds(scenario.max);
+    $("hRetries").textContent =
+        scenario.retries === null || scenario.retries === undefined
+            ? "—"
+            : scenario.retries;
+
+    $("hSource").textContent =
+        scenario.source === "csv" ? "CSV" :
+        scenario.source === "bitacora" ? "Bitácora" : "No disponible";
+
+    renderLatencyChart(scenario);
+    renderSingleBar("chartTotal", scenario.total, "Tiempo total", "s");
+    renderSingleBar("chartThroughput", scenario.throughput, "Throughput", "sol/s");
+    renderDistribution(scenario);
+    renderDetails(scenario);
+}
+
+/* ---------------------------------------------------------
+   GRÁFICAS SVG SIN LIBRERÍAS EXTERNAS
+--------------------------------------------------------- */
+
+function emptyChart(id, message) {
+    $(id).innerHTML = `<div class="empty">${escapeHTML(message)}</div>`;
+}
+
+function renderLatencyChart(scenario) {
+    const values = [
+        { label: "Media", value: scenario.avg, color: "#6b9cff" },
+        { label: "p95", value: scenario.p95, color: "#b58aff" }
+    ].filter(item => item.value !== null && item.value !== undefined
+        && Number.isFinite(Number(item.value)));
+
+    if (!values.length) {
+        emptyChart("chartLatency", "No hay datos de latencia.");
+        return;
+    }
+
+    const max = Math.max(...values.map(item => Number(item.value)), 0.01);
+    const width = 340;
+    const height = 205;
+    const left = 45;
+    const top = 22;
+    const bottom = 35;
+    const plotHeight = height - top - bottom;
+    const barWidth = 48;
+    const positions = [105, 220];
+
+    let svg = `
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Latencia media y p95">
+    `;
+
+    for (let i = 0; i <= 4; i++) {
+        const y = top + plotHeight * i / 4;
+        const value = max * (1 - i / 4);
+
+        svg += `
+            <line x1="${left}" y1="${y}" x2="${width - 10}" y2="${y}"
+                stroke="#293750" stroke-width="1"/>
+            <text x="${left - 7}" y="${y + 3}" text-anchor="end"
+                font-size="9" fill="#8b9ab4">${formatNumber(value, 2)}</text>
+        `;
+    }
+
+    values.forEach((item, index) => {
+        const value = Number(item.value);
+        const barHeight = value / max * plotHeight;
+        const x = positions[index];
+        const y = top + plotHeight - barHeight;
+
+        svg += `
+            <rect x="${x - barWidth / 2}" y="${y}"
+                width="${barWidth}" height="${Math.max(1, barHeight)}"
+                rx="5" fill="${item.color}"/>
+            <text x="${x}" y="${Math.max(top + 10, y - 7)}"
+                text-anchor="middle" font-size="10" fill="#e7edf8">
+                ${formatNumber(value)}
+            </text>
+            <text x="${x}" y="${height - 12}" text-anchor="middle"
+                font-size="10" fill="#8b9ab4">${item.label}</text>
+        `;
+    });
+
+    svg += "</svg>";
+
+    $("chartLatency").innerHTML = svg;
+}
+
+function renderSingleBar(elementId, rawValue, label, unit) {
+    if (rawValue === null || rawValue === undefined ||
+        !Number.isFinite(Number(rawValue))) {
+        emptyChart(elementId, "No hay datos disponibles para esta métrica.");
+        return;
+    }
+
+    const value = Number(rawValue);
+    const max = Math.max(value, 0.01);
+    const width = 340;
+    const height = 205;
+    const left = 36;
+    const right = 15;
+    const top = 28;
+    const plotWidth = width - left - right;
+
+    const barWidth = Math.max(0, plotWidth * value / max);
+
+    const svg = `
+        <svg viewBox="0 0 ${width} ${height}" role="img"
+            aria-label="${escapeHTML(label)}">
+            <text x="${left}" y="17" font-size="11" fill="#8b9ab4">
+                ${escapeHTML(label)}
+            </text>
+
+            <rect x="${left}" y="62" width="${plotWidth}" height="27"
+                rx="6" fill="#26344d"/>
+
+            <rect x="${left}" y="62" width="${barWidth}" height="27"
+                rx="6" fill="#6b9cff"/>
+
+            <text x="${left}" y="118" font-size="23" font-weight="800"
+                fill="#e7edf8">${formatNumber(value)}</text>
+
+            <text x="${left}" y="140" font-size="11"
+                fill="#8b9ab4">${escapeHTML(unit)}</text>
+        </svg>
+    `;
+
+    $(elementId).innerHTML = svg;
+}
+
+function renderDistribution(scenario) {
+    const distribution = scenario.distribution || {};
+    const entries = Object.entries(distribution)
+        .filter(([, value]) => Number(value) >= 0);
+
+    if (!entries.length) {
+        emptyChart(
+            "chartDistribution",
+            "Este resultado no contiene información de distribución por nodo."
+        );
+        return;
+    }
+
+    const colors = ["#6b9cff", "#46d6a0", "#c19aff", "#f5c66b"];
+    const max = Math.max(...entries.map(([, value]) => Number(value)), 1);
+
+    let html = '<div style="display:flex;flex-direction:column;gap:17px;">';
+
+    entries.forEach(([name, rawValue], index) => {
+        const value = Number(rawValue);
+        const percent = Math.max(0, value / max * 100);
+        const color = colors[index % colors.length];
+
+        html += `
+            <div>
+                <div style="display:flex;justify-content:space-between;gap:8px;
+                    font-size:11px;margin-bottom:7px;">
+                    <span>${escapeHTML(nodeLabel(name))}</span>
+                    <strong>${value}</strong>
+                </div>
+
+                <div style="height:9px;border-radius:20px;background:#26344d;overflow:hidden;">
+                    <div style="height:100%;width:${percent}%;background:${color};
+                        border-radius:20px;"></div>
+                </div>
+            </div>
+        `;
+    });
+
+    html += "</div>";
+
+    $("chartDistribution").innerHTML = html;
+}
+
+/* ---------------------------------------------------------
+   DETALLE DEL CSV DEL ESCENARIO
+--------------------------------------------------------- */
+
+function findValue(row, names) {
+    for (const name of names) {
+        if (row[name] !== undefined && row[name] !== "") {
+            return row[name];
+        }
+    }
+
+    return null;
+}
+
+function renderDetails(scenario) {
+    const rows = Array.isArray(scenario.rows) ? scenario.rows : [];
+
+    if (scenario.source !== "csv" || !scenario.detailAvailable || !rows.length) {
+        $("detailCaption").textContent =
+            "Este escenario solo tiene métricas agregadas; no se dispone de filas individuales del CSV.";
+
+        $("detailRows").innerHTML = `
+            <tr>
+                <td colspan="7" class="empty">
+                    No hay detalles individuales disponibles para este escenario.
+                </td>
+            </tr>
+        `;
+
+        return;
+    }
+
+    $("detailCaption").textContent =
+        rows.length + " registros del archivo " + scenario.file;
+
+    $("detailRows").innerHTML = rows.slice(0, 200).map(row => {
+        const id = findValue(row, ["id", "request_id", "solicitud"]);
+        const rawOk = findValue(row, ["ok", "success", "exito"]);
+        const ok = ["true", "1", "yes", "si"].includes(
+            String(rawOk).toLowerCase()
+        );
+
+        const node = findValue(row, ["nodo", "node"]) || "—";
+        const latency = findValue(row, ["latencia_s", "latency"]);
+        const queue = findValue(row, ["espera_cola_s", "queue_wait_s"]);
+        const inference = findValue(row, ["inferencia_s", "inference_s"]);
+        const retries = findValue(row, ["reintentos", "retries"]);
+
+        return `
+            <tr>
+                <td>${escapeHTML(id ?? "—")}</td>
+                <td>
+                    <span class="badge ${ok ? "good" : "bad"}">
+                        ${ok ? "ÉXITO" : "FALLO"}
+                    </span>
+                </td>
+                <td>${escapeHTML(nodeLabel(node))}</td>
+                <td>${formatSeconds(latency)}</td>
+                <td>${formatSeconds(queue)}</td>
+                <td>${formatSeconds(inference)}</td>
+                <td>${escapeHTML(retries ?? "—")}</td>
+            </tr>
+        `;
+    }).join("");
+
+    if (rows.length > 200) {
+        $("detailCaption").textContent +=
+            " · Se muestran los primeros 200 registros para mantener fluida la interfaz.";
+    }
+}
+
+/* ---------------------------------------------------------
+   EVENTOS DE LA INTERFAZ
+--------------------------------------------------------- */
+
+$("scenarioSelect").addEventListener("change", renderSelectedScenario);
+
+$("reloadHistory").addEventListener("click", loadHistory);
+
+$("refreshButton").addEventListener("click", async () => {
+    await refreshState();
+    await loadHistory();
+});
+
+updateTargetSelector();
+
+/* Carga inicial */
+refreshState();
+loadHistory();
+
+/* Actualización automática del estado en vivo */
+setInterval(refreshState, 2000);
+</script>
+</body>
+</html>
