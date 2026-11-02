@@ -11,7 +11,6 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 
 # ============================================================
@@ -135,24 +134,6 @@ app = FastAPI(
 
 
 # ============================================================
-# CORS PARA LOS DOS BALANCEADORES LOCALES
-# ============================================================
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:8080",
-        "http://localhost:8080",
-        "http://127.0.0.1:8081",
-        "http://localhost:8081",
-    ],
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["*"],
-)
-
-
-# ============================================================
 # RUTAS Y ARCHIVOS DEL DASHBOARD
 # ============================================================
 
@@ -243,115 +224,6 @@ SCENARIOS = [
 ]
 
 
-# Resultados agregados reportados anteriormente en la bitácora.
-# Se usan solo como respaldo visual cuando falta el CSV.
-# El detalle por solicitud requiere los CSV reales.
-
-BITACORA_FALLBACK = {
-    "A_1nodo_100": {
-        "n": 100,
-        "success": 100,
-        "total": 34.94,
-        "avg": 17.18,
-        "p95": 33.02,
-        "max": None,
-        "throughput": 2.86,
-        "retries": 0,
-        "distribution": {
-            "ia-node-1": 100
-        }
-    },
-    "B_3nodos_rr_100": {
-        "n": 100,
-        "success": 100,
-        "total": 13.57,
-        "avg": 6.32,
-        "p95": 12.72,
-        "max": None,
-        "throughput": 7.37,
-        "retries": 0,
-        "distribution": {
-            "ia-node-1": 34,
-            "ia-node-2": 33,
-            "ia-node-3": 33
-        }
-    },
-    "C_3nodos_lc_100": {
-        "n": 100,
-        "success": 100,
-        "total": 13.86,
-        "avg": 6.29,
-        "p95": 12.45,
-        "max": None,
-        "throughput": 7.21,
-        "retries": 0,
-        "distribution": {
-            "ia-node-1": 33,
-            "ia-node-2": 34,
-            "ia-node-3": 33
-        }
-    },
-    "D_caida_nodo2_100": {
-        "n": 100,
-        "success": 100,
-        "total": 17.93,
-        "avg": 8.49,
-        "p95": 15.45,
-        "max": None,
-        "throughput": 5.58,
-        "retries": 28,
-        "distribution": {
-            "ia-node-1": 47,
-            "ia-node-2": 5,
-            "ia-node-3": 48
-        }
-    },
-    "E_1nodo_poisson6": {
-        "n": 100,
-        "success": 100,
-        "total": 36.26,
-        "avg": 8.33,
-        "p95": 16.00,
-        "max": None,
-        "throughput": 2.76,
-        "retries": 0,
-        "distribution": {
-            "ia-node-1": 100
-        }
-    },
-    "E_3nodos_rr_poisson6": {
-        "n": 100,
-        "success": 100,
-        "total": 21.20,
-        "avg": 0.76,
-        "p95": 1.53,
-        "max": None,
-        "throughput": 4.72,
-        "retries": 0,
-        "distribution": {
-            "ia-node-1": 33,
-            "ia-node-2": 34,
-            "ia-node-3": 33
-        }
-    },
-    "E_3nodos_lc_poisson6": {
-        "n": 100,
-        "success": 100,
-        "total": 20.76,
-        "avg": 0.72,
-        "p95": 1.53,
-        "max": None,
-        "throughput": 4.82,
-        "retries": 0,
-        "distribution": {
-            "ia-node-1": 34,
-            "ia-node-2": 35,
-            "ia-node-3": 31
-        }
-    },
-}
-
-
 # ============================================================
 # LECTURA DE CSV
 # ============================================================
@@ -421,8 +293,8 @@ async def dashboard_resultados():
     """
     Lee los CSV de resultados/ y entrega datos para el dashboard.
 
-    Si falta el CSV, utiliza los valores agregados de la bitácora
-    como respaldo, sin inventar datos por solicitud.
+    Todos los valores salen de los CSV generados por cliente/simular.py.
+    Si falta el CSV de un escenario, se marca como no disponible.
     """
 
     summaries = _summary_rows()
@@ -444,47 +316,29 @@ async def dashboard_resultados():
         )
 
         # ----------------------------------------------------
-        # No existe CSV: usar respaldo o marcar como N/D
+        # No existe CSV: marcar como no disponible
         # ----------------------------------------------------
 
         if not rows:
-            fallback = BITACORA_FALLBACK.get(filename)
-
-            if fallback:
-                scenarios.append({
-                    "file": f"{filename}.csv",
-                    "title": title,
-                    "short": short,
-                    "available": True,
-                    "source": "bitacora",
-                    "detailAvailable": False,
-                    "successRate": (
-                        fallback["success"]
-                        / fallback["n"]
-                        * 100
-                    ),
-                    **fallback
-                })
-            else:
-                scenarios.append({
-                    "file": f"{filename}.csv",
-                    "title": title,
-                    "short": short,
-                    "available": False,
-                    "source": "missing",
-                    "detailAvailable": False,
-                    "n": 0,
-                    "success": 0,
-                    "successRate": 0,
-                    "total": None,
-                    "avg": None,
-                    "p95": None,
-                    "max": None,
-                    "throughput": None,
-                    "retries": None,
-                    "distribution": {}
-                })
-
+            # Sin CSV no se muestran números: el escenario debe ejecutarse.
+            scenarios.append({
+                "file": f"{filename}.csv",
+                "title": title,
+                "short": short,
+                "available": False,
+                "source": "missing",
+                "detailAvailable": False,
+                "n": 0,
+                "success": 0,
+                "successRate": 0,
+                "total": None,
+                "avg": None,
+                "p95": None,
+                "max": None,
+                "throughput": None,
+                "retries": None,
+                "distribution": {}
+            })
             continue
 
         # ----------------------------------------------------
@@ -750,6 +604,8 @@ async def estado():
 
 @app.post("/config")
 async def cambiar(request: Request):
+    """Cambia el algoritmo. Los contadores solo se reinician si se pide
+    explícitamente con {"reiniciar": true}."""
     datos = await request.json()
 
     algoritmo = datos.get("algoritmo")
@@ -757,12 +613,49 @@ async def cambiar(request: Request):
     if algoritmo in ("rr", "lc"):
         config["algoritmo"] = algoritmo
 
-    # El código original reinicia estos contadores al cambiar
-    # la configuración. Tenlo en cuenta al comparar pruebas.
-    for nodo in nodos.values():
-        nodo["atendidas"] = 0
-        nodo["fallos"] = 0
+    if datos.get("reiniciar"):
+        for nodo in nodos.values():
+            nodo["atendidas"] = 0
+            nodo["fallos"] = 0
 
-    rr["i"] = 0
+        rr["i"] = 0
+        log("Contadores reiniciados desde el panel")
 
     return config
+
+
+# ============================================================
+# SIMULAR LA CAÍDA DE UN NODO DESDE EL PANEL
+# ============================================================
+
+@app.post("/simular-caida")
+async def simular_caida(request: Request):
+    """Pide al nodo indicado ({"nodo": 2}) que termine su proceso.
+
+    Es lo mismo que hace simular.py --tumbar: el nodo muere, el
+    balanceador lo detecta y el orquestador (iniciar.py) lo reinicia.
+    """
+    datos = await request.json()
+
+    try:
+        indice = int(datos.get("nodo", 0)) - 1
+    except (TypeError, ValueError):
+        indice = -1
+
+    if not 0 <= indice < len(NODOS):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nodo inválido: este balanceador tiene {len(NODOS)} nodo(s)"
+        )
+
+    url = NODOS[indice]
+
+    try:
+        await cliente.post(f"{url}/crash", timeout=2)
+    except httpx.HTTPError:
+        # El nodo puede cortar la conexión al morir; no es un error.
+        pass
+
+    log(f"Caída simulada desde el panel: {url}")
+
+    return {"nodo": indice + 1, "url": url, "estado": "cayendo"}

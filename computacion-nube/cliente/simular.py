@@ -31,11 +31,13 @@ async def una_consulta(cliente, url, i, tipo, t0, resultados):
         d = r.json() if r.status_code == 200 else {}
         resultados.append({"id": i, "tipo": tipo, "envio_s": round(envio, 3), "latencia_s": round(fin - envio, 3),
                            "ok": r.status_code == 200, "nodo": d.get("nodo", "-"),
-                           "espera_cola_s": d.get("espera_cola_s", ""), "reintentos": d.get("reintentos", "")})
+                           "espera_cola_s": d.get("espera_cola_s", ""), "inferencia_s": d.get("inferencia_s", ""),
+                           "reintentos": d.get("reintentos", "")})
     except httpx.HTTPError as e:
         fin = time.perf_counter() - t0
         resultados.append({"id": i, "tipo": tipo, "envio_s": round(envio, 3), "latencia_s": round(fin - envio, 3),
-                           "ok": False, "nodo": "-", "espera_cola_s": "", "reintentos": type(e).__name__})
+                           "ok": False, "nodo": "-", "espera_cola_s": "", "inferencia_s": "",
+                           "reintentos": type(e).__name__})
 
 
 async def tumbar(cliente, url_nodo, segundos):
